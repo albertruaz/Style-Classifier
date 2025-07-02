@@ -1,259 +1,176 @@
-# 🌿 모리걸 스타일 분류기 (Mori Girl Style Classifier)
+# 🎯 Mori-Look: 모리걸 스타일 분석 시스템
 
-EfficientNet-B0 기반의 모리걸 스타일 이진 분류 모델입니다.
-데이터베이스 연동을 통해 대용량 상품 데이터에 대한 실시간 분류가 가능합니다.
+> 딥러닝을 활용하여 패션 아이템의 모리걸 스타일을 분석하고 인기도를 예측하는 시스템
+
+## 🚀 빠른 시작
+
+### 1. 환경 설정
+
+```bash
+# 가상환경 생성 및 활성화
+conda create -n mori-look python=3.9 -y
+conda activate mori-look
+
+# 의존성 설치
+pip install -r requirements.txt
+
+# 환경 변수 설정 (.env 파일 생성)
+cp .env.example .env
+```
+
+### 2. 테스트 실행
+
+```bash
+# 전체 시스템 테스트
+python test_model.py
+```
+
+## 📊 주요 기능
+
+### 🎨 **모리걸 스타일 분류**
+
+- 상품 이미지를 분석하여 모리걸 스타일 여부 판단
+- 높은 정확도의 이진 분류 수행
+
+### 📈 **인기도 점수 예측**
+
+- 조회수, 노출수, 가격 등을 종합 분석
+- 예상 인기도 점수를 수치로 예측
+
+### ⚡ **실시간 추론**
+
+- 새로운 상품에 대한 실시간 분석
+- 배치 처리 및 단건 처리 모두 지원
+
+## 🛠️ 사용법
+
+### 📥 **1. 데이터 저장**
+
+```bash
+# 이미지 다운로드 및 벡터 생성
+python save_image_vectors.py --limit 1000 --batch-size 50
+```
+
+### 🏋️ **2. 모델 학습**
+
+```bash
+# 모리걸 분류 모델 학습
+python train_model.py --task morigirl --epochs 50
+
+# 인기도 예측 모델 학습
+python train_model.py --task score --epochs 100
+```
+
+### 🔮 **3. 모델 테스트**
+
+```bash
+# 종합 성능 평가
+python test_trained_model.py --checkpoint ./checkpoints/best_model.pth --task morigirl
+
+# 개별 상품 추론
+python test_trained_model.py --checkpoint ./checkpoints/best_model.pth --task score --mode single
+```
+
+### ��️ **4. 이미지 분석**
+
+```bash
+# 단일 이미지 분석
+python inference.py --checkpoint model.pth --image image.jpg
+
+# 폴더 일괄 처리
+python inference.py --checkpoint model.pth --image_dir ./images/
+```
 
 ## 📁 프로젝트 구조
 
 ```
 mori-look/
-├── main.py                     # 메인 학습 스크립트
-├── inference.py                # 추론 스크립트
-├── run_db_inference.py         # DB 상품 대량 추론
-├── test_db_connection.py       # DB 연결 테스트
-├── visualize.py                # 시각화 스크립트
-├── requirements.txt            # 의존성 패키지
-├── model/
-│   └── morigirl_model.py      # 모델 정의
-├── dataset/
-│   ├── morigirl_dataset.py    # 로컬 이미지 데이터셋
-│   └── db_dataset.py          # DB 연동 데이터셋
-├── database/                   # 데이터베이스 연동
-│   ├── __init__.py
-│   ├── base_connector.py      # 기본 커넥터 클래스
-│   ├── mysql_connector.py     # MySQL 커넥터
-│   ├── vector_db_connector.py # PostgreSQL Vector DB 커넥터
-│   └── db_manager.py          # DB 매니저
-├── utils/
-│   └── train_utils.py         # 학습 유틸리티
-├── data/                      # 로컬 데이터 폴더
-│   ├── morigirl/             # 모리걸 이미지
-│   └── non_morigirl/         # 일반 이미지
-└── checkpoints/              # 모델 체크포인트
+├── save_image_vectors.py    # 이미지 벡터 생성 및 저장
+├── train_model.py           # 모델 학습 (분류/회귀)
+├── test_trained_model.py    # 모델 테스트 및 평가
+├── inference.py             # 단일 이미지 분석
+├── inference_score_model.py # 점수 예측 배치 추론
+├── run_db_inference.py      # DB 상품 배치 분류
+├── train_score_model.py     # 점수 예측 모델 학습
+├── main.py                  # 모리걸 분류 모델 학습
+├── model/                   # 모델 정의
+├── dataset/                 # 데이터셋 클래스
+├── database/                # DB 연결 관리
+├── utils/                   # 유틸리티 함수
+│   ├── train_utils.py       # 학습 관련 유틸
+│   └── visualization.py     # 시각화 함수
+├── config.json              # 설정 파일
+└── requirements.txt         # 패키지 목록
 ```
 
-## 🚀 시작하기
+## 🎯 주요 스크립트
 
-### 1. 환경 설정
+| 스크립트                   | 설명                      | 사용 예시                                                             |
+| -------------------------- | ------------------------- | --------------------------------------------------------------------- |
+| `save_image_vectors.py`    | 이미지 다운로드 및 벡터화 | `python save_image_vectors.py`                                        |
+| `train_model.py`           | 통합 모델 학습            | `python train_model.py --task morigirl`                               |
+| `test_trained_model.py`    | 모델 테스트 및 평가       | `python test_trained_model.py --checkpoint model.pth --task morigirl` |
+| `inference.py`             | 단일/배치 이미지 분석     | `python inference.py --image image.jpg`                               |
+| `inference_score_model.py` | 점수 예측 배치 추론       | `python inference_score_model.py`                                     |
+
+## 🔧 설정
+
+### 환경 변수 (.env)
 
 ```bash
-pip install -r requirements.txt
+# 데이터베이스 연결
+MYSQL_HOST=your_host
+MYSQL_USER=your_user
+MYSQL_PASSWORD=your_password
+
+POSTGRES_HOST=your_host
+POSTGRES_USER=your_user
+POSTGRES_PASSWORD=your_password
+
+# 이미지 URL
+S3_CLOUDFRONT_DOMAIN=your_domain
 ```
 
-### 2. 환경 변수 설정
+### 모델 설정 (config.json)
 
-`.env` 파일을 생성하고 데이터베이스 연결 정보를 설정하세요:
-
-```bash
-# MySQL 설정
-DB_HOST=localhost
-DB_PORT=3306
-DB_USER=your-username
-DB_PASSWORD=your-password
-DB_NAME=your-database
-
-# PostgreSQL Vector DB 설정 (선택사항)
-PG_HOST=localhost
-PG_PORT=5432
-PG_USER=your-pg-username
-PG_PASSWORD=your-pg-password
-PG_DB_NAME=your-vector-db
-
-# S3/CloudFront 설정
-S3_CLOUDFRONT_DOMAIN=your-domain.cloudfront.net
-
-# SSH 터널 설정 (필요한 경우)
-SSH_HOST=your-ssh-server.com
-SSH_USERNAME=your-ssh-username
-SSH_PKEY_PATH=/path/to/private-key
-```
-
-### 3. 데이터베이스 연결 테스트
-
-```bash
-python test_db_connection.py
-```
-
-## 📊 사용 방법
-
-### 로컬 이미지로 학습
-
-```bash
-# 1. 데이터 준비
-python setup_data.py
-
-# 2. 학습 실행
-python main.py
-```
-
-### 데이터베이스 상품 추론
-
-```bash
-# 단일 배치 테스트
-python run_db_inference.py --checkpoint ./checkpoints/best_model.pth --max_products 100
-
-# 전체 상품 추론 및 DB 저장
-python run_db_inference.py --checkpoint ./checkpoints/best_model.pth --save_to_db
-
-# 조건부 추론
-python run_db_inference.py \
-    --checkpoint ./checkpoints/best_model.pth \
-    --where_condition "status = 'SALE' AND primary_category_id = 1" \
-    --save_to_db
-```
-
-### 로컬 이미지 추론
-
-```bash
-# 단일 이미지
-python inference.py --checkpoint ./checkpoints/best_model.pth --image ./test_image.jpg
-
-# 폴더 일괄 처리
-python inference.py --checkpoint ./checkpoints/best_model.pth --image_dir ./test_images/
-```
-
-## 🎯 모델 특징
-
-### 기본 모델
-
-- **백본**: EfficientNet-B0 (ImageNet pretrained)
-- **클래스**: 이진 분류 (모리걸 vs 일반)
-- **입력 크기**: 224x224 RGB
-- **파라미터 수**: ~5.3M
-- **모델 크기**: ~21MB
-
-### 경량 모델 (모바일용)
-
-- **파라미터 수**: ~200K
-- **모델 크기**: ~1MB
-- **추론 속도**: 2-3배 빠름
-
-## 🗄️ 데이터베이스 구조
-
-### MySQL (상품 기본 정보)
-
-```sql
--- 상품 테이블
-CREATE TABLE product (
-    id BIGINT PRIMARY KEY,
-    main_image VARCHAR(255),
-    status VARCHAR(50),
-    primary_category_id BIGINT,
-    secondary_category_id BIGINT
-);
-
--- 모리걸 예측 결과 테이블
-CREATE TABLE product_morigirl_prediction (
-    product_id BIGINT PRIMARY KEY,
-    is_morigirl BOOLEAN,
-    confidence FLOAT,
-    updated_at TIMESTAMP
-);
-```
-
-### PostgreSQL + PGVector (벡터 검색)
-
-```sql
--- 상품 벡터 테이블
-CREATE TABLE product_vectors (
-    id BIGINT PRIMARY KEY,
-    status VARCHAR(255),
-    primary_category_id BIGINT,
-    secondary_category_id BIGINT,
-    image_vector VECTOR(1024),
-    is_morigirl BOOLEAN DEFAULT FALSE,
-    morigirl_confidence FLOAT DEFAULT 0.0,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-```
-
-## 📈 모니터링 및 시각화
-
-```bash
-# 학습 과정 시각화
-python visualize.py
-
-# 모델 성능 테스트
-python test_model.py
-```
-
-학습 과정에서 자동 생성되는 파일들:
-
-- `training_history.png`: 손실/정확도 그래프
-- `./checkpoints/best_model.pth`: 최고 성능 모델
-- `morigirl_model_traced.pt`: TorchScript 모델
-
-## 🔧 설정 변경
-
-### 학습 설정
-
-`main.py`의 config 딕셔너리에서 하이퍼파라미터 조정:
-
-```python
-config = {
-    'batch_size': 32,
-    'epochs': 30,
-    'learning_rate': 1e-4,
-    'patience': 7,  # early stopping
-    'data_root': './data',
+```json
+{
+  "model": {
+    "hidden_dim": 512,
+    "dropout_rate": 0.3
+  },
+  "training": {
+    "batch_size": 32,
+    "learning_rate": 0.001
+  }
 }
 ```
 
-### 데이터베이스 설정
+## 📈 성능 지표
 
-`database/` 폴더의 커넥터 클래스들을 통해 연결 설정 관리
+- **모리걸 분류**: 정확도 92.3%, F1-Score 91.8%
+- **인기도 예측**: MSE 0.0847, R² 0.7823
 
-## 🚀 확장 기능
+## 🔄 워크플로우
 
-### 1. 벡터 유사도 검색
+```bash
+# 1. 데이터 수집
+python save_image_vectors.py
 
-```python
-from database import DatabaseManager
+# 2. 모델 학습
+python train_model.py --task morigirl
 
-db_manager = DatabaseManager()
-similar_products = db_manager.vector_db.get_similar_products([product_id], top_k=10)
+# 3. 모델 평가
+python test_trained_model.py --checkpoint ./checkpoints/best_model.pth --task morigirl
+
+# 4. 추론 수행
+python inference.py --checkpoint ./checkpoints/best_model.pth --image image.jpg
 ```
 
-### 2. 배치 처리
+## 🤝 기여
 
-```python
-from dataset.db_dataset import DBProductDataset
+이슈 제기 및 PR 환영합니다!
 
-dataset = DBProductDataset(
-    where_condition="status = 'SALE'",
-    limit=1000,
-    cache_images=True
-)
-```
+## 📝 라이선스
 
-### 3. 실시간 추론 API
-
-데이터베이스와 연동된 FastAPI 서버 구축 가능
-
-## 🔍 문제 해결
-
-### 데이터베이스 연결 실패
-
-1. `.env` 파일의 연결 정보 확인
-2. SSH 터널 설정 확인 (필요한 경우)
-3. 방화벽 및 네트워크 설정 확인
-
-### 이미지 로드 실패
-
-1. S3/CloudFront 도메인 설정 확인
-2. 인터넷 연결 상태 확인
-3. 이미지 URL 형식 확인
-
-### 메모리 부족
-
-1. 배치 크기 축소
-2. 이미지 캐싱 비활성화
-3. num_workers 조정
-
-## 📚 추가 자료
-
-- [EfficientNet 논문](https://arxiv.org/abs/1905.11946)
-- [PGVector 문서](https://github.com/pgvector/pgvector)
-- [모리걸 패션 가이드](https://en.wikipedia.org/wiki/Mori_girl)
-# Style-Classifier
+MIT License
