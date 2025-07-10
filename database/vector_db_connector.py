@@ -284,6 +284,67 @@ class VectorDBConnector(BaseConnector):
         finally:
             session.close()
     
+
+
+    def get_product_vectors_by_ids(self, product_ids: List[int]) -> List[Tuple]:
+        """
+        특정 상품들의 벡터 조회
+        
+        Returns:
+            List[Tuple]: (product_id, image_vector_array)
+        """
+        if not product_ids:
+            return []
+            
+        session = self.Session()
+        try:
+            # IN 쿼리용 플레이스홀더 생성
+            placeholders = ','.join([':id' + str(j) for j in range(len(product_ids))])
+            params = {f'id{j}': product_ids[j] for j in range(len(product_ids))}
+            
+            sql = text(f"""
+                SELECT id, image_vector
+                FROM product_image_vector
+                WHERE id IN ({placeholders})
+            """)
+            
+            result = session.execute(sql, params)
+            return result.fetchall()
+            
+        finally:
+            session.close()
+
+    def get_existing_product_ids(self, batch_size: int = 10000) -> List[int]:
+        """
+        이미 벡터가 생성된 상품 ID들을 조회
+        
+        Args:
+            batch_size: 한 번에 조회할 배치 크기
+            
+        Returns:
+            List[int]: 이미 벡터가 있는 상품 ID 리스트
+        """
+        session = self.Session()
+        try:
+            # 기존 상품 ID들 조회
+            sql = text("""
+                SELECT id 
+                FROM product_image_vector
+                WHERE image_vector IS NOT NULL
+            """)
+            
+            result = session.execute(sql)
+            existing_ids = [row[0] for row in result.fetchall()]
+            
+            print(f"✅ 기존 벡터 데이터: {len(existing_ids):,}개")
+            return existing_ids
+            
+        except Exception as e:
+            print(f"❌ 기존 상품 ID 조회 실패: {e}")
+            return []
+        finally:
+            session.close()
+
     def get_similar_products(self, product_ids: List[int], top_k: int = 50, 
                            same_category_only: bool = True) -> Dict[int, List[Tuple]]:
         """
@@ -299,7 +360,7 @@ class VectorDBConnector(BaseConnector):
         """
         if not product_ids:
             return {}
-            
+        
         session = self.Session()
         try:
             category_condition = """
@@ -322,8 +383,8 @@ class VectorDBConnector(BaseConnector):
                             PARTITION BY p1.id 
                             ORDER BY (p1.image_vector <#> p2.image_vector)
                         ) AS rn
-                    FROM product_vectors p1
-                    JOIN product_vectors p2 ON p1.id != p2.id
+                    FROM product_image_vector p1
+                    JOIN product_image_vector p2 ON p1.id != p2.id
                     WHERE p1.id IN ({placeholders})
                       AND p2.status = 'SALE'
                       {category_condition}
@@ -347,7 +408,7 @@ class VectorDBConnector(BaseConnector):
             
         finally:
             session.close()
-    
+
     def get_morigirl_products(self, limit: Optional[int] = None, 
                              min_confidence: float = 0.5) -> List[Tuple]:
         """
@@ -366,7 +427,7 @@ class VectorDBConnector(BaseConnector):
             
             sql = text(f"""
                 SELECT id, morigirl_confidence, primary_category_id, secondary_category_id
-                FROM product_vectors
+                FROM product_image_vector
                 WHERE is_morigirl = TRUE 
                   AND morigirl_confidence >= :min_confidence
                 ORDER BY morigirl_confidence DESC
@@ -379,30 +440,29 @@ class VectorDBConnector(BaseConnector):
         finally:
             session.close()
     
-    def get_product_vectors_by_ids(self, product_ids: List[int]) -> List[Tuple]:
-        """
-        특정 상품들의 벡터 조회
-        
-        Returns:
-            List[Tuple]: (product_id, image_vector_array)
-        """
-        if not product_ids:
-            return []
-            
+    def check_table_schema(self):
+        """Vector DB 테이블 스키마 확인"""
         session = self.Session()
         try:
-            # IN 쿼리용 플레이스홀더 생성
-            placeholders = ','.join([':id' + str(j) for j in range(len(product_ids))])
-            params = {f'id{j}': product_ids[j] for j in range(len(product_ids))}
-            
-            sql = text(f"""
-                SELECT id, image_vector
-                FROM product_vectors
-                WHERE id IN ({placeholders})
+            # 테이블 목록 조회
+            tables_sql = text("""
+                SELECT table_name 
+                FROM information_schema.tables 
+                WHERE table_schema = 'public' 
+                AND table_name LIKE '%product%'
             """)
             
-            result = session.execute(sql, params)
-            return result.fetchall()
+            result = session.execute(tables_sql)
+            tables = [row[0] for row in result.fetchall()]
             
+            print("📋 발견된 상품 관련 테이블들:")
+            for table in tables:
+                print(f"  - {table}")
+                
+            return tables
+            
+        except Exception as e:
+            print(f"❌ 테이블 스키마 확인 실패: {e}")
+            return []
         finally:
             session.close() 
