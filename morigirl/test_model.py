@@ -21,8 +21,10 @@ from typing import Dict, List, Tuple, Any
 from datetime import datetime
 
 # Local modules
+import sys
+sys.path.append('..')
 from prepare_training_data import MorigirlDataProcessor, MorigirlDataset
-from model.morigirl_model import MoriGirlVectorClassifier
+from morigirl.morigirl_model import MoriGirlVectorClassifier
 
 class MoriGirlModelTester:
     """Trained Morigirl vector classification model test class"""
@@ -82,14 +84,14 @@ class MoriGirlModelTester:
         # 2. Use base_data_dir (automatic path generation)
         if data_paths.get("auto_generate_path", True):
             max_products = data_config["max_products_per_type"]
-            base_path = data_paths.get("base_data_dir", "data/morigirl_{max_products}")
+            base_path = data_paths.get("base_data_dir", "../data/morigirl_{max_products}")
             final_path = base_path.format(max_products=max_products)
             print(f"📁 Auto-generated data path: {final_path}")
             return final_path
         
         # 3. Default value
         max_products = data_config["max_products_per_type"]
-        default_path = f"data/morigirl_{max_products}"
+        default_path = f"../data/morigirl_{max_products}"
         print(f"📁 Default data path: {default_path}")
         return default_path
 

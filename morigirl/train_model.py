@@ -23,8 +23,10 @@ except ImportError:
     print("⚠️  wandb가 설치되지 않았습니다. pip install wandb 로 설치하세요.")
 
 # 로컬 모듈
+import sys
+sys.path.append('..')
 from prepare_training_data import MorigirlDataProcessor, MorigirlDataset
-from model.morigirl_model import MoriGirlVectorClassifier, get_model_info
+from morigirl.morigirl_model import MoriGirlVectorClassifier, get_model_info
 
 class MoriGirlTrainer:
     """모리걸 벡터 분류 모델 학습 클래스"""
@@ -51,6 +53,9 @@ class MoriGirlTrainer:
         self.checkpoint_dir = f"{self.result_dir}/checkpoints"
         
         os.makedirs(self.checkpoint_dir, exist_ok=True)
+        
+        # config.json을 실험 폴더에 복사하여 저장
+        self._save_experiment_config(config_path)
         
         # wandb 초기화
         self.use_wandb = WANDB_AVAILABLE and self.config["wandb"]["enabled"]
@@ -95,14 +100,14 @@ class MoriGirlTrainer:
         # 2. base_data_dir 사용 (자동 경로 생성)
         if data_paths.get("auto_generate_path", True):
             max_products = data_config["max_products_per_type"]
-            base_path = data_paths.get("base_data_dir", "data/morigirl_{max_products}")
+            base_path = data_paths.get("base_data_dir", "../data/morigirl_{max_products}")
             final_path = base_path.format(max_products=max_products)
             print(f"📁 자동 생성 데이터 경로: {final_path}")
             return final_path
         
         # 3. 기본값
         max_products = data_config["max_products_per_type"]
-        default_path = f"data/morigirl_{max_products}"
+        default_path = f"../data/morigirl_{max_products}"
         print(f"📁 기본 데이터 경로: {default_path}")
         return default_path
 
@@ -145,6 +150,38 @@ class MoriGirlTrainer:
         default_path = f"result/{self.experiment_name}"
         print(f"📁 기본 결과 경로: {default_path}")
         return default_path
+
+    def _save_experiment_config(self, config_path: str):
+        """실험 설정을 결과 폴더에 저장"""
+        import shutil
+        import json
+        from datetime import datetime
+        
+        try:
+            # 원본 config 복사
+            experiment_config_path = f"{self.result_dir}/config.json"
+            shutil.copy2(config_path, experiment_config_path)
+            
+            # 실험 메타데이터 추가 저장
+            experiment_metadata = {
+                "experiment_name": self.experiment_name,
+                "start_time": datetime.now().isoformat(),
+                "data_path": self.data_path,
+                "result_dir": self.result_dir,
+                "device": str(self.device),
+                "wandb_enabled": self.use_wandb,
+                "original_config_path": config_path
+            }
+            
+            with open(f"{self.result_dir}/experiment_metadata.json", 'w', encoding='utf-8') as f:
+                json.dump(experiment_metadata, f, ensure_ascii=False, indent=2)
+            
+            print(f"✅ 실험 설정 저장:")
+            print(f"  - {experiment_config_path}")
+            print(f"  - {self.result_dir}/experiment_metadata.json")
+            
+        except Exception as e:
+            print(f"⚠️  실험 설정 저장 실패: {e}")
 
     def init_wandb(self):
         """wandb 초기화"""

@@ -5,7 +5,7 @@ import os
 import numpy as np
 from pathlib import Path
 
-def analyze_npy_files(data_dir: str = "data/morigirl_10000"):
+def analyze_npy_files(data_dir: str = "../data/morigirl_10000"):
     """npy 파일들을 분석하여 정보를 출력"""
     
     # 데이터 폴더 확인

@@ -37,7 +37,7 @@ class MorigirlDataset(Dataset):
 class MorigirlDataProcessor:
     """모리걸 학습 데이터 처리기"""
     
-    def __init__(self, data_dir: str = "data/morigirl_50"):
+    def __init__(self, data_dir: str = "../data/morigirl_50"):
         self.data_dir = data_dir
         self.vectors = []
         self.labels = []
@@ -185,7 +185,7 @@ class MorigirlDataProcessor:
         return train_loader, test_loader
     
     def save_processed_data(self, train_dataset: MorigirlDataset, test_dataset: MorigirlDataset,
-                           output_dir: str = "data/processed"):
+                           output_dir: str = "../data/processed"):
         """처리된 데이터를 파일로 저장"""
         
         os.makedirs(output_dir, exist_ok=True)

@@ -15,12 +15,14 @@ import io
 import hashlib
 from uuid import UUID
 from typing import List, Dict, Any, Tuple
+import sys
+sys.path.append('..')
 from database import DatabaseManager
 
 class ImageVectorExtractor:
     """이미지를 다운로드하고 벡터로 변환하여 DB에 저장"""
     
-    def __init__(self, config_path: str = "./config.json"):
+    def __init__(self, config_path: str = "config.json"):
         with open(config_path, 'r') as f:
             self.config = json.load(f)
         
@@ -54,13 +56,13 @@ class ImageVectorExtractor:
         
         # 1. base_data_dir 사용 (자동 경로 생성)
         if data_paths.get("auto_generate_path", True):
-            base_path = data_paths.get("base_data_dir", "data/morigirl_{max_products}")
+            base_path = data_paths.get("base_data_dir", "../data/morigirl_{max_products}")
             final_path = base_path.format(max_products=max_products_per_type)
             print(f"📁 자동 생성 출력 경로: {final_path}")
             return final_path
         
         # 2. 기본값
-        default_path = f"data/morigirl_{max_products_per_type}"
+        default_path = f"../data/morigirl_{max_products_per_type}"
         print(f"📁 기본 출력 경로: {default_path}")
         return default_path
 

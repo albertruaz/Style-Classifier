@@ -8,8 +8,10 @@ import torch.nn as nn
 import numpy as np
 import pandas as pd
 from typing import List, Dict, Any
+import sys
+sys.path.append('..')
 from database import DatabaseManager
-from model.morigirl_model import MoriGirlVectorClassifier
+from morigirl.morigirl_model import MoriGirlVectorClassifier
 from tqdm import tqdm
 import argparse
 
