@@ -47,6 +47,23 @@ class ImageVectorExtractor:
         print(f"✅ 이미지 벡터 추출기 초기화 완료")
         print(f"  - 디바이스: {self.device}")
 
+    def _get_output_dir(self, max_products_per_type: int) -> str:
+        """config에서 출력 경로 가져오기"""
+        data_config = self.config["data"]
+        data_paths = data_config.get("data_paths", {})
+        
+        # 1. base_data_dir 사용 (자동 경로 생성)
+        if data_paths.get("auto_generate_path", True):
+            base_path = data_paths.get("base_data_dir", "data/morigirl_{max_products}")
+            final_path = base_path.format(max_products=max_products_per_type)
+            print(f"📁 자동 생성 출력 경로: {final_path}")
+            return final_path
+        
+        # 2. 기본값
+        default_path = f"data/morigirl_{max_products_per_type}"
+        print(f"📁 기본 출력 경로: {default_path}")
+        return default_path
+
     def uuid_to_bigint(self, uuid_val) -> int:
         """UUID를 BIGINT로 변환"""
         if isinstance(uuid_val, str):
@@ -249,11 +266,10 @@ class ImageVectorExtractor:
         else:
             return 0.0
 
-    def save_training_data(self, products_data: List[Dict[str, Any]], data_type: str, 
-                          total_processed: int):
-        """학습용 데이터를 data 폴더에 저장"""
+    def save_training_data_split(self, products_data: List[Dict[str, Any]], data_type: str):
+        """학습용 데이터를 train/test로 분할하여 저장"""
         if not products_data:
-            return False
+            return 0, 0
         
         # 세션별 폴더 생성
         os.makedirs(self.output_dir, exist_ok=True)
@@ -273,22 +289,39 @@ class ImageVectorExtractor:
                 }
                 training_data.append(training_item)
             
-            # 파일 저장 (products 단어 제거)
-            filename = f"{self.output_dir}/{data_type}_{total_processed}.npy"
-            np.save(filename, training_data)
+            # config에서 train/test 비율 읽기
+            train_ratio = self.config["data"]["train_test_split"]  # 0.8
             
-            print(f"📁 {data_type} 데이터 저장: {filename} ({len(training_data)}개)")
-            return True
+            # train/test 분할
+            from sklearn.model_selection import train_test_split
+            train_data, test_data = train_test_split(
+                training_data, 
+                test_size=1-train_ratio, 
+                random_state=42,
+                stratify=[item['is_morigirl'] for item in training_data]  # 클래스 비율 유지
+            )
+            
+            # train 파일 저장
+            train_filename = f"{self.output_dir}/{data_type}_train.npy"
+            np.save(train_filename, train_data)
+            print(f"📁 {data_type} train 데이터 저장: {train_filename} ({len(train_data)}개)")
+            
+            # test 파일 저장
+            test_filename = f"{self.output_dir}/{data_type}_test.npy"
+            np.save(test_filename, test_data)
+            print(f"📁 {data_type} test 데이터 저장: {test_filename} ({len(test_data)}개)")
+            
+            return len(train_data), len(test_data)
             
         except Exception as e:
             print(f"❌ {data_type} 데이터 저장 실패: {e}")
-            return False
+            return 0, 0
 
     def process_training_data(self, max_products_per_type: int = 5000):
         """학습용 데이터 처리 - 모리걸/비모리걸 분리"""
         
-        # 데이터 폴더 설정 (숫자만 사용)
-        self.output_dir = f"data/morigirl_{max_products_per_type}"
+        # 데이터 폴더 설정 (config에서 읽기)
+        self.output_dir = self._get_output_dir(max_products_per_type)
         
         print(f"🚀 학습용 데이터 생성 시작")
         print(f"  - 모리걸 최대: {max_products_per_type:,}개")
@@ -298,32 +331,60 @@ class ImageVectorExtractor:
         # 1. 모리걸 데이터 처리
         print(f"\n=== 모리걸 데이터 처리 ===")
         morigirl_products = self.get_morigirl_products(max_products_per_type)
-        morigirl_processed = self._process_product_batch(morigirl_products, "morigirl")
+        morigirl_train, morigirl_test = self._process_product_batch(morigirl_products, "morigirl")
         
         # 2. 비모리걸 데이터 처리
         print(f"\n=== 비모리걸 데이터 처리 ===")
         non_morigirl_products = self.get_non_morigirl_products(max_products_per_type)
-        non_morigirl_processed = self._process_product_batch(non_morigirl_products, "non_morigirl")
+        non_morigirl_train, non_morigirl_test = self._process_product_batch(non_morigirl_products, "non_morigirl")
         
         # 결과 요약
         print(f"\n🎉 학습용 데이터 생성 완료!")
-        print(f"  - 모리걸 데이터: {morigirl_processed}개")
-        print(f"  - 비모리걸 데이터: {non_morigirl_processed}개")
-        print(f"  - 총 데이터: {morigirl_processed + non_morigirl_processed}개")
+        print(f"  - 모리걸 train: {morigirl_train}개, test: {morigirl_test}개 (총 {morigirl_train + morigirl_test}개)")
+        print(f"  - 비모리걸 train: {non_morigirl_train}개, test: {non_morigirl_test}개 (총 {non_morigirl_train + non_morigirl_test}개)")
+        print(f"  - 총 train: {morigirl_train + non_morigirl_train}개")
+        print(f"  - 총 test: {morigirl_test + non_morigirl_test}개")
+        print(f"  - 전체 총합: {morigirl_train + morigirl_test + non_morigirl_train + non_morigirl_test}개")
         
-        # 결과 파일 저장
-        result_data = {
-            "folder_name": self.output_dir,
-            "morigirl_count": morigirl_processed,
-            "non_morigirl_count": non_morigirl_processed,
-            "total_count": morigirl_processed + non_morigirl_processed,
-            "max_products_per_type": max_products_per_type,
-            "completion_time": str(np.datetime64('now')),
+        # 데이터 정보 JSON 파일 생성
+        data_info = {
+            "dataset_info": {
+                "folder_name": self.output_dir,
+                "creation_time": str(np.datetime64('now')),
+                "max_products_per_type": max_products_per_type,
+                "train_ratio": self.config["data"]["train_test_split"],
+                "total_count": morigirl_train + morigirl_test + non_morigirl_train + non_morigirl_test
+            },
+            "file_counts": {
+                "morigirl_train.npy": morigirl_train,
+                "morigirl_test.npy": morigirl_test,
+                "non_morigirl_train.npy": non_morigirl_train,
+                "non_morigirl_test.npy": non_morigirl_test
+            },
+            "summary": {
+                "total_train": morigirl_train + non_morigirl_train,
+                "total_test": morigirl_test + non_morigirl_test,
+                "morigirl_total": morigirl_train + morigirl_test,
+                "non_morigirl_total": non_morigirl_train + non_morigirl_test,
+                "train_ratio_actual": (morigirl_train + non_morigirl_train) / (morigirl_train + morigirl_test + non_morigirl_train + non_morigirl_test),
+                "morigirl_ratio": (morigirl_train + morigirl_test) / (morigirl_train + morigirl_test + non_morigirl_train + non_morigirl_test)
+            },
             "files_created": [
-                f"{self.output_dir}/morigirl_{morigirl_processed}.npy",
-                f"{self.output_dir}/non_morigirl_{non_morigirl_processed}.npy"
+                f"{self.output_dir}/morigirl_train.npy",
+                f"{self.output_dir}/morigirl_test.npy", 
+                f"{self.output_dir}/non_morigirl_train.npy",
+                f"{self.output_dir}/non_morigirl_test.npy"
             ]
         }
+        
+        # JSON 파일 저장
+        data_info_file = f"{self.output_dir}/data_info.json"
+        with open(data_info_file, 'w', encoding='utf-8') as f:
+            json.dump(data_info, f, ensure_ascii=False, indent=2)
+        print(f"📄 데이터 정보 저장: {data_info_file}")
+        
+        # 호환성을 위한 기존 변수명 유지
+        result_data = data_info
         
         # try:
         #     result_file = f"{self.output_dir}/training_data_result.json"
@@ -336,10 +397,10 @@ class ImageVectorExtractor:
         # 폴더 경로 반환
         return self.output_dir
 
-    def _process_product_batch(self, products: List[Dict], data_type: str) -> int:
-        """상품 배치 처리"""
+    def _process_product_batch(self, products: List[Dict], data_type: str) -> Tuple[int, int]:
+        """상품 배치 처리 (train/test 분할)"""
         if not products:
-            return 0
+            return 0, 0
         
         # 벡터 조회
         product_ids = [p['product_id'] for p in products]
@@ -373,11 +434,12 @@ class ImageVectorExtractor:
         
         print(f"💡 {data_type}: 벡터 있는 상품 {len(valid_products)}개 / 전체 {len(products)}개")
         
-        # 파일 저장
+        # 파일 저장 (train/test 분할)
         if valid_products:
-            self.save_training_data(valid_products, data_type, len(valid_products))
+            train_count, test_count = self.save_training_data_split(valid_products, data_type)
+            return train_count, test_count
         
-        return len(valid_products)
+        return 0, 0
 
     def close(self):
         """리소스 정리"""
@@ -389,20 +451,35 @@ def main():
     import argparse
     
     parser = argparse.ArgumentParser(description='모리걸 학습용 데이터 생성')
-    parser.add_argument('--max-products', type=int, default=5000, 
-                       help='각 타입별 최대 상품 수 (기본값: 5,000개)')
+    parser.add_argument('--config-path', default='config.json', help='설정 파일 경로')
+    parser.add_argument('--max-products', type=int, default=None, 
+                       help='각 타입별 최대 상품 수 (설정 파일 우선)')
     
     args = parser.parse_args()
     
     try:
+        # config.json에서 max_products 읽기
+        if args.max_products is None:
+            try:
+                with open(args.config_path, 'r', encoding='utf-8') as f:
+                    config = json.load(f)
+                max_products = config["data"]["max_products_per_type"]
+                print(f"✅ config.json에서 max_products 로드: {max_products}")
+            except Exception as e:
+                print(f"⚠️  config.json 로드 실패, 기본값 사용: {e}")
+                max_products = 5000
+        else:
+            max_products = args.max_products
+            print(f"✅ 커맨드라인에서 max_products 설정: {max_products}")
+        
         extractor = ImageVectorExtractor()
         
         print(f"🚀 모리걸 학습용 데이터 생성 시작")
-        print(f"  - 각 타입별 최대: {args.max_products:,}개")
+        print(f"  - 각 타입별 최대: {max_products:,}개")
         
         # 학습용 데이터 생성
         data_folder = extractor.process_training_data(
-            max_products_per_type=args.max_products
+            max_products_per_type=max_products
         )
         
         print(f"\n🎉 데이터 생성 완료!")

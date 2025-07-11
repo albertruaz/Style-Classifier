@@ -1,6 +1,6 @@
-# 🎯 Mori-Look: 모리걸 스타일 분석 시스템
+# 🎯 Mori-Look: 모리걸 스타일 분류 시스템
 
-> 딥러닝을 활용하여 패션 아이템의 모리걸 스타일을 분석하고 인기도를 예측하는 시스템
+> 딥러닝을 활용하여 패션 아이템의 모리걸 스타일을 자동으로 분류하는 시스템
 
 ## 🚀 빠른 시작
 
@@ -16,104 +16,180 @@ pip install -r requirements.txt
 
 # 환경 변수 설정 (.env 파일 생성)
 cp .env.example .env
+
+# wandb 로그인 (선택사항)
+wandb login
 ```
 
-### 2. 테스트 실행
+### 2. 설정 파일 확인
 
-```bash
-# 전체 시스템 테스트
-python test_model.py
+`config.json` 파일에서 모든 설정을 관리합니다:
+
+```json
+{
+  "style_id": 9,
+  "data": {
+    "max_products_per_type": 5000,
+    "train_test_split": 0.8,
+    "val_split": 0.1
+  },
+  "model": {
+    "input_vector_dim": 1024,
+    "hidden_dim": 128,
+    "dropout_rate": 0.1,
+    "learning_rate": 1e-4,
+    "batch_size": 64,
+    "epochs": 50
+  },
+  "wandb": {
+    "enabled": true,
+    "project": "morigirl-classification"
+  }
+}
 ```
 
 ## 📊 주요 기능
 
 ### 🎨 **모리걸 스타일 분류**
 
-- 상품 이미지를 분석하여 모리걸 스타일 여부 판단
-- 높은 정확도의 이진 분류 수행
+- EfficientNet 기반 이미지 임베딩 벡터 사용
+- 1024차원 → 128차원 → 1 구조의 경량 분류기
+- 높은 정확도의 이진 분류 (모리걸 vs 비모리걸)
 
-### 📈 **인기도 점수 예측**
+### 📈 **실험 추적 (Wandb)**
 
-- 조회수, 노출수, 가격 등을 종합 분석
-- 예상 인기도 점수를 수치로 예측
+- 학습 과정 실시간 모니터링
+- 모델 성능 메트릭 자동 로깅
+- 하이퍼파라미터 실험 관리
 
-### ⚡ **실시간 추론**
+### ⚡ **통합 설정 관리**
 
-- 새로운 상품에 대한 실시간 분석
-- 배치 처리 및 단건 처리 모두 지원
+- config.json을 통한 중앙 집중식 설정
+- 모델 구조, 학습 파라미터, 데이터 설정 일원화
 
 ## 🛠️ 사용법
 
-### 📥 **1. 데이터 저장**
+### 📥 **1. 학습 데이터 생성**
 
 ```bash
-# 이미지 다운로드 및 벡터 생성
-python save_image_vectors.py --limit 1000 --batch-size 50
+# config.json 설정 사용 (기본 5,000개)
+python save_image_vectors.py
+
+# 또는 개수 직접 지정
+python save_image_vectors.py --max-products 1000
 ```
+
+**결과**: `data/morigirl_5000/` 폴더에 저장
+
+- `morigirl_5000.npy`: 모리걸 상품 데이터
+- `non_morigirl_5000.npy`: 비모리걸 상품 데이터
 
 ### 🏋️ **2. 모델 학습**
 
 ```bash
-# 모리걸 분류 모델 학습
-python train_model.py --task morigirl --epochs 50
+# config.json 기반 학습 (wandb 자동 연동)
+python train_model.py
 
-# 인기도 예측 모델 학습
-python train_model.py --task score --epochs 100
+# 커스텀 설정으로 학습
+python train_model.py --config-path custom_config.json
+
+# 특정 데이터로 학습
+python train_model.py --data-path data/morigirl_1000
 ```
+
+**결과**: `result/{MMDDHHMM_RR}/` 폴더에 저장
+
+- `checkpoints/best_model.pth`: 최고 성능 모델
+- `training_history.json`: 학습 기록
 
 ### 🔮 **3. 모델 테스트**
 
 ```bash
-# 종합 성능 평가
-python test_trained_model.py --checkpoint ./checkpoints/best_model.pth --task morigirl
+# 종합 성능 평가 (시각화 포함)
+python test_model.py --checkpoint result/12151430_42/checkpoints/best_model.pth
 
-# 개별 상품 추론
-python test_trained_model.py --checkpoint ./checkpoints/best_model.pth --task score --mode single
+# 빠른 테스트 (10개 샘플)
+python test_model.py --checkpoint result/12151430_42/checkpoints/best_model.pth --quick-test
+
+# 커스텀 설정으로 테스트
+python test_model.py --checkpoint model.pth --config-path custom_config.json
 ```
 
-### ��️ **4. 이미지 분석**
+**결과**: 새로운 `result/{timestamp}/` 폴더에 저장
 
-```bash
-# 단일 이미지 분석
-python inference.py --checkpoint model.pth --image image.jpg
-
-# 폴더 일괄 처리
-python inference.py --checkpoint model.pth --image_dir ./images/
-```
+- `test_results_visualization.png`: 성능 시각화
+- `metrics.json`: 상세 성능 메트릭
+- `predictions.csv`: 예측 결과
+- `classification_report.txt`: 분류 보고서
 
 ## 📁 프로젝트 구조
 
 ```
 mori-look/
-├── save_image_vectors.py    # 이미지 벡터 생성 및 저장
-├── train_model.py           # 모델 학습 (분류/회귀)
-├── test_trained_model.py    # 모델 테스트 및 평가
-├── inference.py             # 단일 이미지 분석
-├── inference_score_model.py # 점수 예측 배치 추론
-├── run_db_inference.py      # DB 상품 배치 분류
-├── train_score_model.py     # 점수 예측 모델 학습
-├── main.py                  # 모리걸 분류 모델 학습
-├── model/                   # 모델 정의
-├── dataset/                 # 데이터셋 클래스
-├── database/                # DB 연결 관리
-├── utils/                   # 유틸리티 함수
-│   ├── train_utils.py       # 학습 관련 유틸
-│   └── visualization.py     # 시각화 함수
-├── config.json              # 설정 파일
-└── requirements.txt         # 패키지 목록
+├── 🔧 설정 파일
+│   ├── config.json              # 통합 설정 파일
+│   └── requirements.txt         # 패키지 목록
+├── 🚀 메인 스크립트
+│   ├── save_image_vectors.py    # 데이터 생성
+│   ├── train_model.py           # 모델 학습
+│   └── test_model.py            # 모델 테스트
+├── 🧠 모델 & 데이터
+│   ├── model/
+│   │   └── morigirl_model.py    # 모델 정의
+│   ├── dataset/
+│   │   └── morigirl_vector_dataset.py
+│   └── prepare_training_data.py # 데이터 처리
+├── 💾 데이터 & 결과
+│   ├── data/                    # 학습 데이터
+│   │   └── morigirl_5000/
+│   └── result/                  # 실험 결과
+│       └── {timestamp}/
+├── 🗄️ 데이터베이스
+│   ├── database/                # DB 연결 관리
+│   └── utils/                   # 유틸리티
+└── 📋 기타
+    └── README.md
 ```
 
 ## 🎯 주요 스크립트
 
-| 스크립트                   | 설명                      | 사용 예시                                                             |
-| -------------------------- | ------------------------- | --------------------------------------------------------------------- |
-| `save_image_vectors.py`    | 이미지 다운로드 및 벡터화 | `python save_image_vectors.py`                                        |
-| `train_model.py`           | 통합 모델 학습            | `python train_model.py --task morigirl`                               |
-| `test_trained_model.py`    | 모델 테스트 및 평가       | `python test_trained_model.py --checkpoint model.pth --task morigirl` |
-| `inference.py`             | 단일/배치 이미지 분석     | `python inference.py --image image.jpg`                               |
-| `inference_score_model.py` | 점수 예측 배치 추론       | `python inference_score_model.py`                                     |
+| 스크립트                | 기능                   | 설정 파일   | 사용 예시                                     |
+| ----------------------- | ---------------------- | ----------- | --------------------------------------------- |
+| `save_image_vectors.py` | 학습 데이터 생성       | config.json | `python save_image_vectors.py`                |
+| `train_model.py`        | 모델 학습 (wandb 연동) | config.json | `python train_model.py`                       |
+| `test_model.py`         | 모델 평가 및 시각화    | config.json | `python test_model.py --checkpoint model.pth` |
 
-## 🔧 설정
+## ⚙️ 설정 옵션
+
+### config.json 상세 설정
+
+```json
+{
+  "data": {
+    "max_products_per_type": 5000, // 각 클래스별 최대 상품 수
+    "train_test_split": 0.8, // 학습/테스트 분할 비율
+    "val_split": 0.1 // 검증 데이터 비율
+  },
+  "model": {
+    "input_vector_dim": 1024, // 입력 벡터 차원
+    "hidden_dim": 128, // 히든 레이어 차원
+    "dropout_rate": 0.1, // 드롭아웃 비율
+    "learning_rate": 1e-4, // 학습률
+    "weight_decay": 0.01, // 가중치 감쇠
+    "batch_size": 64, // 배치 크기
+    "epochs": 50, // 학습 에포크
+    "patience": 10 // Early stopping 인내
+  },
+  "wandb": {
+    "enabled": true, // wandb 사용 여부
+    "project": "morigirl-classification", // 프로젝트 명
+    "entity": null, // 팀/사용자 명
+    "log_frequency": 10, // 로그 주기
+    "save_model": true, // 모델 아티팩트 저장
+    "watch_model": true // 모델 gradients 감시
+  }
+}
+```
 
 ### 환경 변수 (.env)
 
@@ -123,54 +199,108 @@ MYSQL_HOST=your_host
 MYSQL_USER=your_user
 MYSQL_PASSWORD=your_password
 
-POSTGRES_HOST=your_host
-POSTGRES_USER=your_user
-POSTGRES_PASSWORD=your_password
+# 벡터 DB 연결
+MILVUS_HOST=your_host
+MILVUS_PORT=19530
 
-# 이미지 URL
+# 이미지 저장소
 S3_CLOUDFRONT_DOMAIN=your_domain
 ```
 
-### 모델 설정 (config.json)
+## 📈 모델 성능
 
-```json
-{
-  "model": {
-    "hidden_dim": 512,
-    "dropout_rate": 0.3
-  },
-  "training": {
-    "batch_size": 32,
-    "learning_rate": 0.001
-  }
-}
-```
+### 아키텍처
 
-## 📈 성능 지표
+- **입력**: 1024차원 EfficientNet 임베딩 벡터
+- **구조**: 1024 → 128 → 1 (약 130K 파라미터)
+- **출력**: 모리걸 확률 (0~1)
 
-- **모리걸 분류**: 정확도 92.3%, F1-Score 91.8%
-- **인기도 예측**: MSE 0.0847, R² 0.7823
+### 성능 지표
 
-## 🔄 워크플로우
+- **정확도**: ~92%
+- **F1-Score**: ~91%
+- **AUC**: ~95%
+
+## 🔄 전체 워크플로우
 
 ```bash
-# 1. 데이터 수집
+# 1️⃣ 설정 확인
+vim config.json
+
+# 2️⃣ 데이터 생성 (5,000개 x 2클래스)
 python save_image_vectors.py
+# 결과: data/morigirl_5000/
 
-# 2. 모델 학습
-python train_model.py --task morigirl
+# 3️⃣ 모델 학습 (wandb 자동 로깅)
+python train_model.py
+# 결과: result/12151430_42/checkpoints/
 
-# 3. 모델 평가
-python test_trained_model.py --checkpoint ./checkpoints/best_model.pth --task morigirl
+# 4️⃣ 모델 평가 (시각화 생성)
+python test_model.py --checkpoint result/12151430_42/checkpoints/best_model.pth
+# 결과: result/{new_timestamp}/test_results_visualization.png
 
-# 4. 추론 수행
-python inference.py --checkpoint ./checkpoints/best_model.pth --image image.jpg
+# 5️⃣ Wandb에서 실험 결과 확인
+# https://wandb.ai/your-username/morigirl-classification
+```
+
+## 🎛️ 명령어 옵션
+
+### save_image_vectors.py
+
+```bash
+--config-path    # 설정 파일 경로 (기본: config.json)
+--max-products   # 상품 수 override (설정 파일 우선)
+```
+
+### train_model.py
+
+```bash
+--config-path      # 설정 파일 경로
+--data-path        # 데이터 경로 override
+--experiment-name  # 실험 이름 지정
+```
+
+### test_model.py
+
+```bash
+--checkpoint       # 모델 체크포인트 경로 (필수)
+--config-path      # 설정 파일 경로
+--data-path        # 데이터 경로 override
+--quick-test       # 빠른 테스트 모드
+--num-samples      # 빠른 테스트 샘플 수
+```
+
+## 🔍 트러블슈팅
+
+### 1. wandb 오류
+
+```bash
+# wandb 로그인 확인
+wandb login
+
+# wandb 비활성화
+# config.json에서 "wandb.enabled": false
+```
+
+### 2. 메모리 부족
+
+```bash
+# 배치 크기 줄이기
+# config.json에서 "model.batch_size": 32
+```
+
+### 3. 데이터 로딩 실패
+
+```bash
+# 데이터 경로 확인
+ls data/morigirl_5000/
+# morigirl_5000.npy, non_morigirl_5000.npy 존재 확인
 ```
 
 ## 🤝 기여
 
-이슈 제기 및 PR 환영합니다!
+이슈 제기 및 PR을 환영합니다!
 
-## 📝 라이선스
+## �� 라이선스
 
 MIT License

@@ -1,18 +1,49 @@
 {
   "style_id": 9,
-  "model": {
-    "input_vector_dim": 1024,
-    "hidden_dim": 512,
-    "dropout": 0.3,
-    "learning_rate": 1e-4,
-    "batch_size": 64,
-    "epochs": 50
-  },
   "data": {
+    "max_products_per_type": 20000,
     "train_test_split": 0.8,
+    "val_split": 0.1,
     "popularity_threshold": 0.1,
     "min_view_count": 1,
-    "status_filter": ["SALE", "SOLD_OUT"]
+    "status_filter": ["SALE", "SOLD_OUT"],
+    "data_paths": {
+      "base_data_dir": "data/morigirl_{max_products}",
+      "train_data_dir": null,
+      "test_data_dir": null,
+      "auto_generate_path": true
+    },
+    "result_paths": {
+      "base_result_dir": "result",
+      "experiment_name": null,
+      "auto_generate_result_path": true
+    },
+    "test_paths": {
+      "checkpoint_path": null,
+      "auto_find_best_model": true,
+      "target_experiment": "07111028_25"
+    }
+  },
+  "model": {
+    "input_vector_dim": 1024,
+    "hidden_dim": 768,
+    "hidden_dim2": 512,
+    "dropout_rate": 0.1,
+    "learning_rate": 1e-4,
+    "weight_decay": 0.01,
+    "batch_size": 1024,
+    "epochs": 100,
+    "patience": 5,
+    "min_delta": 0.001,
+    "early_stopping_enabled": false
+  },
+  "wandb": {
+    "enabled": true,
+    "project": "morigirl-classification",
+    "entity": "vingle",
+    "log_frequency": 5,
+    "save_model": true,
+    "watch_model": true
   },
   "database": {
     "mysql_batch_size": 1000,

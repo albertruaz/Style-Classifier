@@ -43,20 +43,32 @@ class MorigirlDataProcessor:
         self.labels = []
         self.product_ids = []
         
-    def load_npy_files(self) -> bool:
-        """npy 파일들을 로드하여 학습용 데이터로 변환"""
+    def load_npy_files(self, split_type: str = "all") -> bool:
+        """npy 파일들을 로드하여 학습용 데이터로 변환
+        
+        Args:
+            split_type: "all" (전체), "train" (train만), "test" (test만)
+        """
         
         data_path = Path(self.data_dir)
         if not data_path.exists():
             print(f"❌ 데이터 폴더가 없습니다: {self.data_dir}")
             return False
         
-        npy_files = list(data_path.glob("*.npy"))
+        # split_type에 따라 파일 필터링
+        if split_type == "train":
+            pattern = "*_train.npy"
+        elif split_type == "test":
+            pattern = "*_test.npy"
+        else:  # "all"
+            pattern = "*.npy"
+            
+        npy_files = list(data_path.glob(pattern))
         if not npy_files:
-            print(f"❌ {self.data_dir} 폴더에 npy 파일이 없습니다.")
+            print(f"❌ {self.data_dir} 폴더에 {pattern} 파일이 없습니다.")
             return False
         
-        print(f"📁 로딩할 npy 파일: {len(npy_files)}개")
+        print(f"📁 로딩할 npy 파일 ({split_type}): {len(npy_files)}개")
         
         total_loaded = 0
         morigirl_count = 0
@@ -98,7 +110,7 @@ class MorigirlDataProcessor:
                                 
                                 total_loaded += 1
                 
-                print(f"  ✅ {npy_file.name}: {len(data)}개 중 {total_loaded - (morigirl_count + non_morigirl_count) if 'morigirl' not in npy_file.name else morigirl_count if 'morigirl' in npy_file.name and 'non_' not in npy_file.name else non_morigirl_count}개 로딩")
+                print(f"  ✅ {npy_file.name}: {len(data)}개 로딩")
                 
             except Exception as e:
                 print(f"❌ {npy_file.name} 로딩 실패: {e}")
@@ -112,7 +124,7 @@ class MorigirlDataProcessor:
         self.labels = np.array(self.labels)
         self.product_ids = np.array(self.product_ids)
         
-        print(f"\n📊 데이터 로딩 완료:")
+        print(f"\n📊 데이터 로딩 완료 ({split_type}):")
         print(f"  - 총 데이터: {total_loaded:,}개")
         print(f"  - 모리걸: {morigirl_count:,}개 ({morigirl_count/total_loaded*100:.1f}%)")
         print(f"  - 비모리걸: {non_morigirl_count:,}개 ({non_morigirl_count/total_loaded*100:.1f}%)")
