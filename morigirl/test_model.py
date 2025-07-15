@@ -275,7 +275,7 @@ class MoriGirlModelTester:
                 preds = (probs > 0.5).astype(int)
                 
                 all_probs.extend(probs)
-                all_preds.extend(preds)
+                all_preds.extend(preds.astype(int))  # 명시적으로 int 타입 보장
                 all_labels.extend(labels.numpy())
                 all_product_ids.extend(product_ids.numpy())
         
@@ -286,28 +286,32 @@ class MoriGirlModelTester:
         print(f"\n📊 Calculating performance metrics")
         
         # Basic metrics
-        accuracy = accuracy_score(labels, preds)
+        # 연속값 라벨을 이진값으로 변환 (메트릭 계산용)
+        binary_labels = (labels >= 0.5).astype(int)
+        binary_preds = preds.astype(int)  # 예측값도 명시적으로 이진값으로 변환
+        
+        accuracy = accuracy_score(binary_labels, binary_preds)
         precision, recall, f1, _ = precision_recall_fscore_support(
-            labels, preds, average='binary', zero_division=0
+            binary_labels, binary_preds, average='binary', zero_division=0
         )
         
         # AUC
         try:
-            auc = roc_auc_score(labels, probs)
+            auc = roc_auc_score(binary_labels, probs)
         except:
             auc = 0.0
         
         # Confusion matrix
-        cm = confusion_matrix(labels, preds)
+        cm = confusion_matrix(binary_labels, binary_preds)
         
         # ROC curve data
-        fpr, tpr, _ = roc_curve(labels, probs)
+        fpr, tpr, _ = roc_curve(binary_labels, probs)
         
         # Precision-Recall curve data
-        pr_precision, pr_recall, _ = precision_recall_curve(labels, probs)
+        pr_precision, pr_recall, _ = precision_recall_curve(binary_labels, probs)
         
         # Classification report by class
-        report = classification_report(labels, preds, target_names=['Non-Morigirl', 'Morigirl'], output_dict=True)
+        report = classification_report(binary_labels, binary_preds, target_names=['Non-Morigirl', 'Morigirl'], output_dict=True)
         
         metrics = {
             'accuracy': accuracy,
@@ -478,7 +482,10 @@ class MoriGirlModelTester:
         results_df.to_csv(csv_path, index=False)
         
         # 3. Classification Report Text Save
-        report_text = classification_report(labels, preds, target_names=['Non-Morigirl', 'Morigirl'])
+        # 연속값 라벨을 이진값으로 변환 (메트릭 계산용)
+        binary_labels = (labels >= 0.5).astype(int)
+        binary_preds = preds.astype(int)  # 예측값도 명시적으로 이진값으로 변환
+        report_text = classification_report(binary_labels, binary_preds, target_names=['Non-Morigirl', 'Morigirl'])
         report_path = os.path.join(self.results_dir, 'classification_report.txt')
         with open(report_path, 'w', encoding='utf-8') as f:
             f.write(report_text)

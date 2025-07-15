@@ -247,11 +247,16 @@ class MoriGirlTrainer:
         train_ids = train_processor.product_ids
         
         from sklearn.model_selection import train_test_split
+        
+        # 연속값 라벨을 이진값으로 변환 (stratify용)
+        # 0.5 기준으로 이진화: 0.5 이상이면 1(모리걸), 미만이면 0(비모리걸)
+        binary_labels_for_stratify = (train_labels >= 0.5).astype(int)
+        
         X_train, X_val, y_train, y_val, ids_train, ids_val = train_test_split(
             train_vectors, train_labels, train_ids,
             test_size=val_size_adjusted,
             random_state=42,
-            stratify=train_labels
+            stratify=binary_labels_for_stratify  # 이진 라벨로 stratify
         )
         
         # 새로운 Dataset 객체 생성
@@ -405,7 +410,7 @@ class MoriGirlTrainer:
             preds = (probs > 0.5).astype(int)
             
             all_probs.extend(probs.flatten())
-            all_preds.extend(preds.flatten())
+            all_preds.extend(preds.flatten().astype(int))  # 명시적으로 int 타입 보장
             all_labels.extend(labels.cpu().numpy().flatten())
             
             # Progress bar 업데이트
@@ -415,9 +420,13 @@ class MoriGirlTrainer:
             # 배치 단위 로깅 제거 - 에포크 단위로만 로깅
         
         # 최종 메트릭 계산
-        accuracy = accuracy_score(all_labels, all_preds)
+        # 연속값 라벨을 이진값으로 변환 (메트릭 계산용)
+        binary_labels = (np.array(all_labels) >= 0.5).astype(int)
+        binary_preds = np.array(all_preds).astype(int)  # 예측값도 명시적으로 이진값으로 변환
+        
+        accuracy = accuracy_score(binary_labels, binary_preds)
         try:
-            auc = roc_auc_score(all_labels, all_probs)
+            auc = roc_auc_score(binary_labels, all_probs)
         except:
             auc = 0.0
         
@@ -450,16 +459,20 @@ class MoriGirlTrainer:
                 preds = (probs > 0.5).astype(int)
                 
                 all_probs.extend(probs.flatten())
-                all_preds.extend(preds.flatten())
+                all_preds.extend(preds.flatten().astype(int))  # 명시적으로 int 타입 보장
                 all_labels.extend(labels.cpu().numpy().flatten())
         
         # 메트릭 계산
-        accuracy = accuracy_score(all_labels, all_preds)
+        # 연속값 라벨을 이진값으로 변환 (메트릭 계산용)
+        binary_labels = (np.array(all_labels) >= 0.5).astype(int)
+        binary_preds = np.array(all_preds).astype(int)  # 예측값도 명시적으로 이진값으로 변환
+        
+        accuracy = accuracy_score(binary_labels, binary_preds)
         precision, recall, f1, _ = precision_recall_fscore_support(
-            all_labels, all_preds, average='binary', zero_division=0
+            binary_labels, binary_preds, average='binary', zero_division=0
         )
         try:
-            auc = roc_auc_score(all_labels, all_probs)
+            auc = roc_auc_score(binary_labels, all_probs)
         except:
             auc = 0.0
         
@@ -758,15 +771,19 @@ class MoriGirlTrainer:
                 preds = (probs > 0.5).astype(int)
                 
                 all_probs.extend(probs)
-                all_preds.extend(preds)
+                all_preds.extend(preds.astype(int))  # 명시적으로 int 타입 보장
                 all_labels.extend(labels.cpu().numpy())
         
         # 최종 성능 계산
-        accuracy = accuracy_score(all_labels, all_preds)
+        # 연속값 라벨을 이진값으로 변환 (메트릭 계산용)
+        binary_labels = (np.array(all_labels) >= 0.5).astype(int)
+        binary_preds = np.array(all_preds).astype(int)  # 예측값도 명시적으로 이진값으로 변환
+        
+        accuracy = accuracy_score(binary_labels, binary_preds)
         precision, recall, f1, _ = precision_recall_fscore_support(
-            all_labels, all_preds, average='binary', zero_division=0
+            binary_labels, binary_preds, average='binary', zero_division=0
         )
-        auc = roc_auc_score(all_labels, all_probs)
+        auc = roc_auc_score(binary_labels, all_probs)
         
         print(f"\n📊 최종 {dataset_name} 성능:")
         print(f"  - 정확도: {accuracy:.4f}")
@@ -777,7 +794,7 @@ class MoriGirlTrainer:
         
         # 분류 리포트
         print(f"\n📋 {dataset_name} 분류 리포트:")
-        print(classification_report(all_labels, all_preds, target_names=['비모리걸', '모리걸']))
+        print(classification_report(binary_labels, binary_preds, target_names=['비모리걸', '모리걸']))
         
         return {
             'accuracy': accuracy,
